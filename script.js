@@ -40,28 +40,32 @@ window.addEventListener('scroll', () => {
   });
 });
 
-// ─── VINE & FLOWER HOVER EFFECT ──────────────────────────────────────────────
-// Renders BEHIND card content (z-index: 0), clipped inside the card bounds.
-// In dark mode, vines/flowers/sprouts emit a soft CSS glow.
+// ─── DETECT TOUCH DEVICE ─────────────────────────────────────────────────────
+function isTouchDevice() {
+  return (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
+}
+
+// ─── VINE & FLOWER HOVER / TAP EFFECT ────────────────────────────────────────
+// Desktop: hover in / hover out (fast, ~1s)
+// Mobile/Tablet: tap to sprout in over 4s, tap again to sprout out
 
 function isDarkMode() {
   return document.documentElement.getAttribute('data-theme') === 'dark';
 }
 
 class VineCanvas {
-  constructor(el) {
+  constructor(el, touchMode) {
     this.el = el;
+    this.touchMode = touchMode; // true on touch devices
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = `
       position:absolute;inset:0;width:100%;height:100%;
       pointer-events:none;border-radius:inherit;
       z-index:0;opacity:0;transition:opacity 0.3s;
     `;
-    // Parent must be positioned so absolute canvas sits inside it
     const pos = getComputedStyle(el).position;
     if (pos === 'static') el.style.position = 'relative';
 
-    // Ensure all direct text/icon children sit above the canvas
     Array.from(el.children).forEach(child => {
       if (child !== this.canvas) {
         child.style.position = 'relative';
@@ -69,13 +73,15 @@ class VineCanvas {
       }
     });
 
-    el.insertBefore(this.canvas, el.firstChild); // insert first so it's behind DOM children
+    el.insertBefore(this.canvas, el.firstChild);
     this.ctx = this.canvas.getContext('2d');
     this.vines = [];
     this.frame = null;
-    this.active = false;
+    this.active = false;   // currently shown / growing
     this.progress = 0;
     this.dir = 0;
+    // Touch state
+    this.tapOpen = false;  // whether touch has sprouted it open
   }
 
   resize() {
@@ -89,7 +95,6 @@ class VineCanvas {
   seedVines() {
     this.vines = [];
     const count = Math.floor(2 + Math.random() * 2);
-    // Pick corners to grow from
     const corners = [
       { x: 0,      y: this.H },
       { x: this.W, y: this.H },
@@ -120,7 +125,6 @@ class VineCanvas {
       pts.push({ x, y });
     }
 
-    // Flowers along the vine
     const flowers = [];
     for (let i = 2; i < pts.length; i += Math.floor(2 + Math.random() * 3)) {
       flowers.push({
@@ -132,23 +136,20 @@ class VineCanvas {
       });
     }
 
-    // Small leaves
     const leaves = [];
     for (let i = 1; i < pts.length - 1; i += Math.floor(2 + Math.random() * 2)) {
       leaves.push({ idx: i, side: Math.random() > 0.5 ? 1 : -1, size: 5 + Math.random() * 5 });
     }
 
-    // Hanging sprouts: short drooping tendrils from random vine points
     const sprouts = [];
     for (let i = 2; i < pts.length - 1; i += Math.floor(3 + Math.random() * 3)) {
       const sproutLen = 8 + Math.random() * 14;
       const side = Math.random() > 0.5 ? 1 : -1;
-      const droop = Math.PI / 2 + side * (Math.random() * 0.5); // hang downward
+      const droop = Math.PI / 2 + side * (Math.random() * 0.5);
       sprouts.push({
         idx: i,
         len: sproutLen,
         droop,
-        // tiny bud at tip
         budR: 1.5 + Math.random() * 2,
         hue: [100, 140, 80, 200][Math.floor(Math.random() * 4)],
       });
@@ -167,7 +168,6 @@ class VineCanvas {
 
     const dark = isDarkMode();
 
-    // In dark mode apply glow filter on the canvas context
     if (dark) {
       ctx.shadowColor = 'rgba(100, 230, 130, 0.7)';
       ctx.shadowBlur = 6;
@@ -183,7 +183,7 @@ class VineCanvas {
       const fullSegs = Math.floor(drawn);
       const frac = drawn - fullSegs;
 
-      // ── Stem ──
+      // Stem
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i <= fullSegs && i < pts.length; i++) {
@@ -201,7 +201,7 @@ class VineCanvas {
       ctx.lineJoin = 'round';
       ctx.stroke();
 
-      // ── Hanging sprouts ──
+      // Hanging sprouts
       sprouts.forEach(sp => {
         if (sp.idx > drawn) return;
         const spProgress = Math.min(1, (drawn - sp.idx) / 1.0);
@@ -209,10 +209,8 @@ class VineCanvas {
         const tipX = p.x + Math.cos(sp.droop) * sp.len * spProgress;
         const tipY = p.y + Math.sin(sp.droop) * sp.len * spProgress;
 
-        // Sprout stem
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
-        // slight curve via quadratic
         const midX = p.x + Math.cos(sp.droop) * sp.len * 0.5 * spProgress;
         const midY = p.y + Math.sin(sp.droop + 0.3) * sp.len * 0.5 * spProgress;
         ctx.quadraticCurveTo(midX, midY, tipX, tipY);
@@ -220,7 +218,6 @@ class VineCanvas {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Bud at the tip
         if (spProgress > 0.7) {
           const budP = (spProgress - 0.7) / 0.3;
           ctx.beginPath();
@@ -232,7 +229,7 @@ class VineCanvas {
         }
       });
 
-      // ── Leaves ──
+      // Leaves
       leaves.forEach(leaf => {
         if (leaf.idx > drawn) return;
         const leafP = Math.min(1, (drawn - leaf.idx) / 1.5);
@@ -253,7 +250,7 @@ class VineCanvas {
         ctx.restore();
       });
 
-      // ── Flowers ──
+      // Flowers
       flowers.forEach(fl => {
         if (fl.idx > drawn) return;
         const flP = Math.min(1, (drawn - fl.idx) / 1.2);
@@ -285,7 +282,6 @@ class VineCanvas {
           ctx.fill();
         }
 
-        // Center dot
         ctx.beginPath();
         ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
         ctx.fillStyle = dark
@@ -302,6 +298,11 @@ class VineCanvas {
     });
   }
 
+  // ── Speed: touchMode uses 4s (step ≈ 0.004/frame @60fps), desktop ~1s (0.028) ──
+  get stepSize() {
+    return this.touchMode ? 0.004 : 0.028;
+  }
+
   show() {
     if (this.active) return;
     this.active = true;
@@ -315,13 +316,14 @@ class VineCanvas {
   hide() {
     this.active = false;
     this.dir = -1;
+    // On touch, sprout out is also slow (4s) for a satisfying retract
     this.animate();
   }
 
   animate() {
     cancelAnimationFrame(this.frame);
     const step = () => {
-      this.progress = Math.max(0, Math.min(1, this.progress + this.dir * 0.028));
+      this.progress = Math.max(0, Math.min(1, this.progress + this.dir * this.stepSize));
       this.draw(this.progress);
       if ((this.dir === 1 && this.progress < 1) || (this.dir === -1 && this.progress > 0)) {
         this.frame = requestAnimationFrame(step);
@@ -336,13 +338,36 @@ class VineCanvas {
 }
 
 function attachVines() {
+  const touch = isTouchDevice();
   const targets = document.querySelectorAll(
     '.skill-chip, .contact-card, .stat-card, .timeline-item, .hero-badge, .btn-primary, .btn-outline'
   );
+
   targets.forEach(el => {
-    const vc = new VineCanvas(el);
-    el.addEventListener('mouseenter', () => vc.show());
-    el.addEventListener('mouseleave', () => vc.hide());
+    const vc = new VineCanvas(el, touch);
+
+    if (touch) {
+      // ── TOUCH: tap toggles sprout in / sprout out ──
+      el.addEventListener('touchstart', (e) => {
+        // Don't block scrolling — only respond to deliberate short taps
+        e.stopPropagation();
+
+        if (!vc.tapOpen) {
+          // First tap: sprout in
+          vc.tapOpen = true;
+          vc.show();
+        } else {
+          // Second tap: sprout out
+          vc.tapOpen = false;
+          vc.hide();
+        }
+      }, { passive: true });
+
+    } else {
+      // ── DESKTOP: hover ──
+      el.addEventListener('mouseenter', () => vc.show());
+      el.addEventListener('mouseleave', () => vc.hide());
+    }
   });
 }
 
