@@ -347,20 +347,17 @@ function attachVines() {
     const vc = new VineCanvas(el, touch);
 
     if (touch) {
-      // ── TOUCH: tap toggles sprout in / sprout out ──
+      // ── TOUCH: tap to sprout in, auto sprout out after 3s ──
       el.addEventListener('touchstart', (e) => {
-        // Don't block scrolling — only respond to deliberate short taps
         e.stopPropagation();
-
-        if (!vc.tapOpen) {
-          // First tap: sprout in
-          vc.tapOpen = true;
-          vc.show();
-        } else {
-          // Second tap: sprout out
+        if (vc.tapOpen) return; // already showing, ignore extra taps
+        vc.tapOpen = true;
+        vc.show();
+        clearTimeout(vc.autoHideTimer);
+        vc.autoHideTimer = setTimeout(() => {
           vc.tapOpen = false;
           vc.hide();
-        }
+        }, 3000);
       }, { passive: true });
 
     } else {
