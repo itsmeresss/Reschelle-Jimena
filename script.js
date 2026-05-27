@@ -300,7 +300,7 @@ class VineCanvas {
 
   // ── Speed: touchMode uses 4s (step ≈ 0.004/frame @60fps), desktop ~1s (0.028) ──
   get stepSize() {
-    return this.touchMode ? 0.004 : 0.028;
+    return this.touchMode ? 0.0055 : 0.028;
   }
 
   show() {
