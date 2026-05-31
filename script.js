@@ -1,4 +1,3 @@
-// THEME
 const root = document.documentElement;
 const btn = document.getElementById('themeBtn');
 let dark = false;
@@ -8,7 +7,6 @@ function toggleTheme() {
   btn.textContent = dark ? '🌙 Dark' : '☀ Light';
 }
 
-// MOBILE MENU
 function toggleMenu() {
   const m = document.getElementById('mobileMenu');
   m.classList.toggle('open');
@@ -17,7 +15,6 @@ function closeMenu() {
   document.getElementById('mobileMenu').classList.remove('open');
 }
 
-// SCROLL REVEAL
 const revealEls = document.querySelectorAll('.reveal');
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((e, i) => {
@@ -29,9 +26,8 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 revealEls.forEach(el => observer.observe(el));
 
-// Active nav on scroll
 const sections = document.querySelectorAll('section[id]');
-const navLinks = document.querySelectorAll('.nav-links a');
+const navLinks = document.querySelectorAll('.nav-menu a');
 window.addEventListener('scroll', () => {
   let cur = '';
   sections.forEach(s => { if (window.scrollY >= s.offsetTop - 100) cur = s.id; });
@@ -40,14 +36,9 @@ window.addEventListener('scroll', () => {
   });
 });
 
-// ─── DETECT TOUCH DEVICE ─────────────────────────────────────────────────────
 function isTouchDevice() {
   return (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
 }
-
-// ─── VINE & FLOWER HOVER / TAP EFFECT ────────────────────────────────────────
-// Desktop: hover in / hover out (fast, ~1s)
-// Mobile/Tablet: tap to sprout in over 4s, tap again to sprout out
 
 function isDarkMode() {
   return document.documentElement.getAttribute('data-theme') === 'dark';
@@ -56,7 +47,7 @@ function isDarkMode() {
 class VineCanvas {
   constructor(el, touchMode) {
     this.el = el;
-    this.touchMode = touchMode; // true on touch devices
+    this.touchMode = touchMode;
     this.canvas = document.createElement('canvas');
     this.canvas.style.cssText = `
       position:absolute;inset:0;width:100%;height:100%;
@@ -77,11 +68,10 @@ class VineCanvas {
     this.ctx = this.canvas.getContext('2d');
     this.vines = [];
     this.frame = null;
-    this.active = false;   // currently shown / growing
+    this.active = false;
     this.progress = 0;
     this.dir = 0;
-    // Touch state
-    this.tapOpen = false;  // whether touch has sprouted it open
+    this.tapOpen = false;
   }
 
   resize() {
@@ -183,7 +173,6 @@ class VineCanvas {
       const fullSegs = Math.floor(drawn);
       const frac = drawn - fullSegs;
 
-      // Stem
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i <= fullSegs && i < pts.length; i++) {
@@ -201,7 +190,6 @@ class VineCanvas {
       ctx.lineJoin = 'round';
       ctx.stroke();
 
-      // Hanging sprouts
       sprouts.forEach(sp => {
         if (sp.idx > drawn) return;
         const spProgress = Math.min(1, (drawn - sp.idx) / 1.0);
@@ -229,7 +217,6 @@ class VineCanvas {
         }
       });
 
-      // Leaves
       leaves.forEach(leaf => {
         if (leaf.idx > drawn) return;
         const leafP = Math.min(1, (drawn - leaf.idx) / 1.5);
@@ -250,7 +237,6 @@ class VineCanvas {
         ctx.restore();
       });
 
-      // Flowers
       flowers.forEach(fl => {
         if (fl.idx > drawn) return;
         const flP = Math.min(1, (drawn - fl.idx) / 1.2);
@@ -298,7 +284,6 @@ class VineCanvas {
     });
   }
 
-  // ── Speed: touchMode uses 4s (step ≈ 0.004/frame @60fps), desktop ~1s (0.028) ──
   get stepSize() {
     return this.touchMode ? 0.0055 : 0.028;
   }
@@ -316,7 +301,6 @@ class VineCanvas {
   hide() {
     this.active = false;
     this.dir = -1;
-    // On touch, sprout out is also slow (4s) for a satisfying retract
     this.animate();
   }
 
@@ -340,17 +324,16 @@ class VineCanvas {
 function attachVines() {
   const touch = isTouchDevice();
   const targets = document.querySelectorAll(
-    '.skill-chip, .contact-card, .stat-card, .timeline-item, .hero-badge, .btn-primary, .btn-outline'
+    '.skill-item, .contact-box, .number-card, .timeline-entry, .age-badge, .btn-primary, .btn-outline'
   );
 
   targets.forEach(el => {
     const vc = new VineCanvas(el, touch);
 
     if (touch) {
-      // ── TOUCH: tap to sprout in, auto sprout out after 3s ──
       el.addEventListener('touchstart', (e) => {
         e.stopPropagation();
-        if (vc.tapOpen) return; // already showing, ignore extra taps
+        if (vc.tapOpen) return;
         vc.tapOpen = true;
         vc.show();
         clearTimeout(vc.autoHideTimer);
@@ -361,7 +344,6 @@ function attachVines() {
       }, { passive: true });
 
     } else {
-      // ── DESKTOP: hover ──
       el.addEventListener('mouseenter', () => vc.show());
       el.addEventListener('mouseleave', () => vc.hide());
     }
